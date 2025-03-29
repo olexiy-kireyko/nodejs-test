@@ -9,6 +9,9 @@ import { createStudent } from '../services/students.js';
 import { parsePaginationParams } from '../utils/parsePaginationParams.js';
 import { parseSortParams } from '../utils/parseSortParams.js';
 import { parseFilterParams } from '../utils/parseFilterParams.js';
+import { saveFileToUploadDir } from '../utils/saveFileToUploadDir.js';
+import { getEnvVar } from '../utils/getEnvVar.js';
+import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 
 export const getStudentsController = async (req, res) => {
   const { page, perPage } = parsePaginationParams(req.query);
@@ -80,7 +83,30 @@ export const upsertStudentController = async (req, res, next) => {
 
 export const patchStudentController = async (req, res, next) => {
   const { studentId } = req.params;
-  const result = await updateStudent(studentId, req.body);
+  const photo = req.file;
+
+  let photoUrl;
+  if (photo) {
+    if (getEnvVar('ENABLE_CLOUDINARY') === 'true') {
+      console.log(
+        'getEnvVar(ENABLE_CLOUDINARY):',
+        getEnvVar('ENABLE_CLOUDINARY'),
+      );
+
+      photoUrl = await saveFileToCloudinary(photo);
+    } else {
+      photoUrl = await saveFileToUploadDir(photo);
+    }
+  }
+  // let photoUrl;
+  // if (photo) {
+  //   photoUrl = await saveFileToUploadDir(photo);
+  // }
+
+  const result = await updateStudent(studentId, {
+    ...req.body,
+    photo: photoUrl,
+  });
   if (!result) {
     next(createHttpError(404, 'student not found'));
     return;
